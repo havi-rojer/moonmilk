@@ -1,0 +1,1 @@
+sequences.sh is a bash script provided by the european nucleotide database that includes the list of accession numbers and the script to conveniently download fastq.gz files
