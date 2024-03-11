@@ -13,7 +13,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "../figures/01_DADA2/") # Send any figures to this folder
+setwd("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/figures/01_DADA2/") # Send any figures to this folder
 ```
 
 # Before you start
@@ -101,7 +102,7 @@ reverse_filteredQual_plot_2 <- plotQualityProfile(reverse_reads[random_samples])
 reverse_filteredQual_plot_2
 
 # Plot them together with patchwork
-#forward_filteredQual_plot_2 + reverse_filteredQual_plot_2
+forward_filteredQual_plot_2 + reverse_filteredQual_plot_2
 # When I try to run this I get the following error: Error in Ops.data.frame(guide_loc, panel_loc) : ‘==’ only defined for equally-sized data frames
 ```
 
@@ -122,13 +123,13 @@ reverse_preQC_plot <-
 # Show the plot
 reverse_preQC_plot
 
-#preQC_aggregate_plot <- 
+preQC_aggregate_plot <- forward_preQC_plot + reverse_preQC_plot
   # Plot the forward and reverse together 
-  #forward_preQC_plot + reverse_preQC_plot
+
 # When I try to run this I get the following error: Error in Ops.data.frame(guide_loc, panel_loc) : ‘==’ only defined for equally-sized data frames
 
 # Show the plot
-#preQC_aggregate_plot
+preQC_aggregate_plot
 ```
 
 Here, we see that the plots are showing the standard Illumina output: The quality is higher at the beginning of the read and slowly gets worse and worse as the read progresses. This is typical of Illumina sequencing because of phasing. The forward reads actually look a bit more low quality than the reverse reads.
@@ -339,7 +340,7 @@ head(merged_ASVs[[3]])
 ```
 
 # Create Raw ASV Count Table 
-```{r generate-ASV-table, fig.width=3.5, fig.height=3}
+```{r generate-ASV-table, fig.height=3, fig.width=3.5}
 # Create the ASV Count Table 
 raw_ASV_table <- makeSequenceTable(merged_ASVs)
 # Write out the file to data/01_DADA2
@@ -359,3 +360,4 @@ data.frame(Seq_Length = nchar(getSequences(raw_ASV_table))) %>%
   ggplot(aes(x = Seq_Length )) + 
   geom_histogram() + 
   labs(title = "Raw distribution of ASV length")
+## We're stuck here.
