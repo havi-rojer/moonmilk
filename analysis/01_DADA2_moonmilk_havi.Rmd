@@ -588,19 +588,8 @@ save(asv_tab, file = "data/01_DADA2/ASV_counts.RData")
 save(track_counts_df, file = "data/01_DADA2/track_read_counts.RData")
 ```
 
-# Check Render Time
-```{r stop-time}
-# Take the time now that we are at the end of the script
-end_time <- Sys.time()
-end_time 
-
-# Echo the elapsed time
-elapsed_time <- round((end_time - start_time), 3)
-elapsed_time
-```
-
 # Session Information 
 ```{r session-info}
-# Ensure reproducibility 
+# Ensure reproducibility
 devtools::session_info()
 ```
