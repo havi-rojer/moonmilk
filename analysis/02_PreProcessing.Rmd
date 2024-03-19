@@ -1,0 +1,82 @@
+---
+title: "02 - PreProcessing"
+output: 
+  html_document:
+    css: "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/css/tufte.css"
+    toc: yes
+    toc_float:
+      collapse: no
+      smooth_scroll: yes
+      toc_depth: 3
+date: "`r Sys.Date()`"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+setwd("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/figures/02_PreProcessing/") # Send any figures to this folder
+```
+
+# Load libraries 
+```{r load-libraries}
+library(devtools)
+#devtools::install_github("joey711/phyloseq")
+library(phyloseq)
+library(tidyverse)
+```
+
+# Goals
+
+Here, we will process the data into a phyloseq object. 
+
+- ASV table 
+- Taxonomy Table 
+- Track Reads (metadata)
+
+Then, we will remove the following: 
+
+1. Remove Chloroplasts
+2. Remove Mitochondria. 
+3. Remove samples without "enough" reads. 
+
+Finally, write data file of phyloseq output.
+
+
+# Load Data 
+
+## ASV Table
+
+```{r load-asv-table}
+# First, load asv table
+load("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/data/01_DADA2/ASV_counts.RData")
+
+# Inspect asv_tab
+head(asv_tab)[,1:5]
+
+# Fix names 
+sample_names <- colnames(asv_tab)
+samples_fixed <- sapply(strsplit(basename(sample_names), "_"), `[`,1) 
+head(samples_fixed)
+
+# re-write the ASV count file to fix names 
+colnames(asv_tab) <- samples_fixed
+str(asv_tab)
+```
+
+##  Taxonomy Table
+```{r load-tax-table}
+tax_df <- read.table("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", skip = 1)
+head(tax_df)
+
+# fix column names 
+colnames(tax_df) <- c("asv_names", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "ASV", "ASVseq")
+
+head(tax_df)
+
+# Taxonomy Table Matrix
+tax_mat <- 
+  tax_df %>%
+  tibble::column_to_rownames(., var = "asv_names") %>%
+  as.matrix()
+```
