@@ -584,7 +584,7 @@ write.table(asv_tax, "data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", quote = FALSE
 # RData objects are for easy loading :) 
 save(noChimeras_ASV_table, file = "data/01_DADA2/noChimeras_ASV_table.RData")
 save(asv_tab, file = "data/01_DADA2/ASV_counts.RData")
-# And save the track_counts_df a R object, which we will merge with metadata information in the next step of the analysis in nalysis/02_Taxonomic_Assignment. 
+# And save the track_counts_df a R object, which we will merge with metadata information in the next step of the analysis in Analysis/02_Taxonomic_Assignment. 
 save(track_counts_df, file = "data/01_DADA2/track_read_counts.RData")
 ```
 

@@ -144,3 +144,9 @@ raw_physeq
 # Save this raw phyloseq object 
 save(raw_physeq, file = "data/02_PreProcessing/raw_physeq.RData")
 ```
+
+# Session Information 
+```{r session-info}
+# Ensure reproducibility 
+devtools::session_info()
+```
