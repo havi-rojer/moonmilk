@@ -93,8 +93,11 @@ dim(metadata_df)
 colnames(metadata_df)
 # Replace the name of the column
 colnames(metadata_df)[1] <- "names"
+print(metadata_df)
+# Add column with cave_name
+metadata_df <- separate(metadata_df, sample_title, into = c("cave", "sample"), sep = "-")  
 
-head(metadata_df)
+print(metadata_df)
 head(track_counts_df)
 
 metadata_track_reads_df <- 
@@ -213,14 +216,32 @@ seqSums_df %>%
 
 # plot it! 
 seqSums_df %>%
-  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = sample_title)) + 
+  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = cave)) + 
   geom_bar(stat = "identity") 
 
 # Density plot
 
 seqSums_df %>%
-  ggplot(aes(TotalSeqs, fill = sample_title)) +
+  ggplot(aes(TotalSeqs, fill = cave)) +
   geom_density(alpha = 0.5)
+```
+
+# Remove samples with few reads 
+
+```{r rm-samps}
+# What's the min seq depth? 
+min(sample_sums(noChlorosMitos_physeq))
+
+# We don't have any samples with zero seq depth so we're good
+
+raw_preprocessed_physeq <- noChlorosMitos_physeq
+```
+
+# Save Preprocessed Phyloseq Object
+```{r save-physeq}
+#set your WD to wherever you wanna put this file
+
+save(raw_preprocessed_physeq, file = "./raw_preprocessed_physeq.RData")
 ```
 
 ## Session Information 
