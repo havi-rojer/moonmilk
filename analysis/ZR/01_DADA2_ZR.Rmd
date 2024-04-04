@@ -1,0 +1,595 @@
+---
+title: "01 - DADA2 Moonmilk"
+output: 
+  html_document:
+    css: "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/css/tufte.css"
+    toc: yes
+    toc_float:
+      collapse: no
+      smooth_scroll: yes
+      toc_depth: 3
+date: "`r Sys.Date()`"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+setwd("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/figures/01_DADA2/") # Send any figures to this folder
+```
+
+# Before you start
+
+## Set my seed
+
+```{r set-seed}
+# Any number can be chosen
+set.seed(3141596)
+```
+
+# Goals of this file
+
+1. Use raw fastq files and generate quality plots to assess quality of reads.
+2. Filter and trim out bad sequences and bases from our sequencing files.
+3. Write out fastq files with high quality sequences.
+4. Evaluate the quality from our filter and trim.
+5. Infer errors on forward and reverse reads individually.
+6. Identified ASVs on forward and reverse reads seperately using the error model.
+7. Merge forward and reverse ASVs into "contiguous ASVs".
+8. Generate the ASV count table (`otu_table` input for phyloseq).
+9. Remove chimeras.
+10. Track the read counts
+11. Assign taxonomy.
+12. Prepare the data for export!
+
+Output that we need:
+
+1. ASV Count Table: `otu_table`
+2. Taxonomy Table: `tax_table`
+3. Sample Information: `sample_data` - track the reads lost throughout the DADA2 workflow
+
+# Load Libraries 
+```{r load-libraries}
+# Efficient package loading with pacman 
+pacman::p_load(tidyverse, BiocManager, devtools, dada2, 
+               phyloseq, patchwork, DT, iNEXT, vegan,
+               install = FALSE)
+```
+
+# Load Data 
+```{r load-data}
+# Set the raw fastq path to the raw sequencing files 
+# Path to the fastq files 
+raw_fastqs_path <- "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/data/01_DADA2/01_raw_gzipped_fastqs"
+raw_fastqs_path
+
+# What files are in this path? Intuition Check 
+head(list.files(raw_fastqs_path))
+
+# How many files are there? 
+str(list.files(raw_fastqs_path))
+
+# Create vector of forward reads
+forward_reads <- list.files(raw_fastqs_path, pattern = "1.fastq.gz", full.names = TRUE)  
+# Intuition Check 
+head(forward_reads)  
+
+# Create a vector of reverse reads 
+reverse_reads <- list.files(raw_fastqs_path, pattern = "2.fastq.gz", full.names = TRUE)
+head(reverse_reads)
+```
+
+# Assess Raw Read Quality 
+
+## Evaluate raw sequence quality 
+
+Let's see the quality of the raw reads *before* we trim
+
+### Plot 12 random samples of plots 
+```{r raw-quality-plot, fig.width=12, fig.height=8}
+# Randomly select 2 samples from dataset to evaluate 
+random_samples <- sample(1:length(reverse_reads), size = 2)
+random_samples
+
+# Calculate and plot quality of these two samples
+forward_filteredQual_plot_2 <- plotQualityProfile(forward_reads[random_samples]) + 
+  labs(title = "Forward Read: Raw Quality")
+# Show the plot
+forward_filteredQual_plot_2
+
+reverse_filteredQual_plot_2 <- plotQualityProfile(reverse_reads[random_samples]) + 
+  labs(title = "Reverse Read: Raw Quality")
+# Show the plot
+reverse_filteredQual_plot_2
+
+# Plot them together with patchwork
+forward_filteredQual_plot_2 + reverse_filteredQual_plot_2
+# When I try to run this I get the following error: Error in Ops.data.frame(guide_loc, panel_loc) : ‘==’ only defined for equally-sized data frames
+```
+
+### Aggregated Raw Quality Plots 
+```{r raw-aggregate-plot, fig.width=5.5, fig.height=3.5}
+# Aggregate all QC plots 
+# Forward reads
+forward_preQC_plot <- 
+  plotQualityProfile(forward_reads, aggregate = TRUE) + 
+  labs(title = "Forward Pre-QC")
+# Show the plot
+forward_preQC_plot
+
+# reverse reads
+reverse_preQC_plot <- 
+  plotQualityProfile(reverse_reads, aggregate = TRUE) + 
+  labs(title = "Reverse Pre-QC")
+# Show the plot
+reverse_preQC_plot
+
+preQC_aggregate_plot <- forward_preQC_plot + reverse_preQC_plot
+  # Plot the forward and reverse together 
+
+
+# Show the plot
+preQC_aggregate_plot
+```
+
+Here, we see that the plots are showing the standard Illumina output: The quality is higher at the beginning of the read and slowly gets worse and worse as the read progresses. This is typical of Illumina sequencing because of phasing. The forward reads actually look a bit more low quality than the reverse reads.
+
+## Prepare a placeholder for filtered reads 
+```{r prep-filtered-sequences}
+# vector of our samples, extract sample name from files 
+samples <- sapply(strsplit(basename(forward_reads), "_"), `[`,1) 
+# Intuition Check 
+head(samples)
+
+# Place filtered reads into filtered_fastqs_path
+filtered_fastqs_path <- "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/data/01_DADA2/02_filtered_fastqs"
+filtered_fastqs_path
+
+# create 2 variables: filtered_F, filtered_R
+filtered_forward_reads <- 
+  file.path(filtered_fastqs_path, paste0(samples, "_R1_filtered.fastq.gz"))
+length(filtered_forward_reads)
+head(filtered_forward_reads)
+
+# reverse reads
+filtered_reverse_reads <- 
+  file.path(filtered_fastqs_path, paste0(samples, "_R2_filtered.fastq.gz"))
+length(filtered_reverse_reads)
+head(filtered_reverse_reads)
+```
+
+# Filter and Trim Reads
+
+Parameters of filter and trim **DEPEND ON THE DATASET**. The things to keep in mind are:  
+- The library preparation: *Are the primers included in the sequence? If so, they need to be trimmed out in this step*.  
+- What do the above quality profiles of the reads look like? *If they are lower quality, it is highly recommended to use `maxEE = c(1,1)`.*  
+- Do the reads dip suddenly in their quality? If so, explore `trimLeft` and `truncLen`
+
+Check out more of the parameters using `?filterAndTrim` to bring up the help page and do some googling about it. Some notes on two examples are below, with a description of a few of the parameters:
+
+Moonmilk Dataset: This dataset was generated with the library preparation described by [Theodorescu et al., 2023 Microbial Ecology](https://doi.org/10.1007/s00248-023-02286-8), the reads maintained high Phred Scores (above 30, even more typically above ~34) until aroud 200bps. Therefore, we will use a  stringent `maxEE = c(1,1)` and truncate the reads at 250bps.  
+
+- `maxEE` is a quality filtering threshold applied to expected errors. Here, if there's 2 expected errors. It's ok. But more than 2. Throw away the sequence. Two values, first is for forward reads; second is for reverse reads.  
+- `trimLeft` can be used to remove the beginning bases of a read (e.g. to trim out primers!) 
+- `truncLen` can be used to trim your sequences after a specific base pair when the quality gets lower. Though, please note that this will shorten the ASVs! For example, this can be used when the quality of the sequence suddenly gets lower, or clearly is typically lower. So, if the quality of the read drops below a phred score of 25 (on the y-axis of the plotQualityProfile above, which indicates ~99.5% confidence per base).  
+- `maxN` the number of N bases. Here, using ASVs, we should ALWAYS remove all Ns from the data.  
+
+```{r filter-and-trim}
+# Assign a vector to filtered reads 
+# trim out poor bases, first 3 bps on F reads
+# write out filtered fastq files 
+filtered_reads <- 
+  filterAndTrim(fwd = forward_reads, filt = filtered_forward_reads,
+              rev = reverse_reads, filt.rev = filtered_reverse_reads,
+              maxN = 0, maxEE = c(1,1),
+              truncLen = 250, rm.phix = TRUE, compress = TRUE, multithread = TRUE)
+```
+
+# Assess Trimmed Read Quality 
+
+```{r filterTrim-quality-plots,  fig.width=12, fig.height=8}
+# Plot the 12 random samples after QC
+forward_filteredQual_plot_12 <- 
+  plotQualityProfile(filtered_forward_reads[random_samples]) + 
+  labs(title = "Trimmed Forward Read Quality")
+# Show the plot
+forward_filteredQual_plot_12
+
+reverse_filteredQual_plot_12 <- 
+  plotQualityProfile(filtered_reverse_reads[random_samples]) + 
+  labs(title = "Trimmed Reverse Read Quality")
+# Show the plot
+reverse_filteredQual_plot_12
+
+# Put the two plots together 
+forward_filteredQual_plot_12 + reverse_filteredQual_plot_12
+```
+
+## Aggregated Trimmed Plots 
+```{r qc-aggregate-plot, fig.width=5.5, fig.height=3.5}
+# Aggregate all QC plots 
+# Forward reads
+forward_postQC_plot <- 
+  plotQualityProfile(filtered_forward_reads, aggregate = TRUE) + 
+  labs(title = "Forward Post-QC")
+# Show the plot
+forward_postQC_plot
+
+# reverse reads
+reverse_postQC_plot <- 
+  plotQualityProfile(filtered_reverse_reads, aggregate = TRUE) + 
+  labs(title = "Reverse Post-QC")
+# Show the plot
+reverse_postQC_plot
+
+postQC_aggregate_plot <- forward_postQC_plot + reverse_postQC_plot
+# Show the plot
+postQC_aggregate_plot
+```
+
+The quality of the sequences look much better. It's even more obvious that the reverse reads are higher quality for some reason, but even so the quality of the forward reads is fine.
+
+
+## Stats on read output from `filterAndTrim`
+
+```{r filterTrim-stats}
+# Make output into dataframe 
+filtered_df <- as.data.frame(filtered_reads)
+head(filtered_df)
+
+
+# calculate some stats 
+filtered_df %>%
+  reframe(median_reads_in = median(reads.in),
+          median_reads_out = median(reads.out),
+          median_percent_retained = (median(reads.out)/median(reads.in)))
+```
+
+we retained 58.4% of our reads. This should be "enough". I think our `filterAndTrim()` parameters are alright for this situations.
+
+### Visualize QC differences in plot 
+```{r pre-post-QC-plot, fig.width=6, fig.height=5.5}
+# Plot the pre and post together in one plot
+preQC_aggregate_plot / postQC_aggregate_plot
+```
+
+# Error Modelling 
+
+## Learn the errors 
+```{r learn-errors, fig.width=12, fig.height=8}
+# Forward reads 
+error_forward_reads <- 
+  learnErrors(filtered_forward_reads, multithread = TRUE)
+# Plot Forward  
+forward_error_plot <- 
+  plotErrors(error_forward_reads, nominalQ = TRUE) + 
+  labs(title = "Forward Read Error Model")
+# Show the plot
+forward_error_plot
+
+# Reverse reads 
+error_reverse_reads <- 
+  learnErrors(filtered_reverse_reads, multithread = TRUE)
+# Plot reverse
+reverse_error_plot <- 
+  plotErrors(error_reverse_reads, nominalQ = TRUE) + 
+  labs(title = "Reverse Read Error Model")
+# Show the plot
+reverse_error_plot
+
+# Put the two plots together
+forward_error_plot + reverse_error_plot
+```
+
+- The error rates for each possible transition (A→C, A→G, …) are shown in the plot above. 
+
+Details of the plot: 
+- **Points**: The observed error rates for each consensus quality score.  
+- **Black line**: Estimated error rates after convergence of the machine-learning algorithm.  
+- **Red line:** The error rates expected under the nominal definition of the Q-score.  
+
+Similar to what is mentioned in the dada2 tutorial: the estimated error rates (black line) are a "reasonably good" fit to the observed rates (points), and the error rates drop slowly with increased quality as expected.  We can now infer ASVs! 
+
+# Infer ASVs 
+
+**An important note:** This process occurs separately on forward and reverse reads! This is quite a different approach from how OTUs are identified in Mothur and also from UCHIME, oligotyping, and other OTU, MED, and ASV approaches.
+
+```{r infer-ASVs}
+# Infer ASVs on the forward sequences
+dada_forward <- dada(filtered_forward_reads,
+                     err = error_forward_reads, 
+                     multithread = TRUE)
+
+typeof(dada_forward)
+# Grab a sample and look at it 
+dada_forward$`ERR11588428_R1_filtered.fastq.gz`
+
+
+# Infer ASVs on the reverse sequences 
+dada_reverse <- dada(filtered_reverse_reads,
+                     err = error_reverse_reads,
+                     multithread = TRUE)
+
+# Inspect 
+dada_reverse[1]
+dada_reverse[10]
+```
+
+
+# Merge Forward & Reverse ASVs
+
+Now, merge the forward and reverse ASVs into contigs. 
+
+```{r merge-ASVs}
+# merge forward and reverse ASVs
+merged_ASVs <- mergePairs(dada_forward, filtered_forward_reads, 
+                          dada_reverse, filtered_reverse_reads,
+                          verbose = TRUE)
+
+# Evaluate the output 
+typeof(merged_ASVs)
+length(merged_ASVs)
+names(merged_ASVs)
+
+# Inspect the merger data.frame from the 20210602-MA-ABB1P 
+head(merged_ASVs[[3]])
+```
+
+# Create Raw ASV Count Table 
+```{r generate-ASV-table, fig.height=3, fig.width=3.5}
+# Create the ASV Count Table 
+raw_ASV_table <- makeSequenceTable(merged_ASVs)
+# Write out the file to data/01_DADA2
+
+# Check the type and dimensions of the data
+dim(raw_ASV_table)
+class(raw_ASV_table)
+typeof(raw_ASV_table)
+
+# Inspect the distribution of sequence lengths of all ASVs in dataset 
+table(nchar(getSequences(raw_ASV_table)))
+
+# Inspect the distribution of sequence lengths of all ASVs in dataset 
+# AFTER TRIM
+data.frame(Seq_Length = nchar(getSequences(raw_ASV_table))) %>%
+  ggplot(aes(x = Seq_Length )) + 
+  geom_histogram() + 
+  labs(title = "Raw distribution of ASV length")
+
+
+###################################################
+###################################################
+# TRIM THE ASVS
+# Let's trim the ASVs to only be the right size. The most common size of merged ASV is 465/466, which matches the range of V3-V4 region of 450 to 600 base pairs.
+
+# We will allow for a few 
+raw_ASV_table_trimmed <- raw_ASV_table[,nchar(colnames(raw_ASV_table)) %in% 465:466]
+
+# Inspect the distribution of sequence lengths of all ASVs in dataset 
+table(nchar(getSequences(raw_ASV_table_trimmed)))
+
+# What proportion is left of the sequences? 
+sum(raw_ASV_table_trimmed)/sum(raw_ASV_table)
+
+# Inspect the distribution of sequence lengths of all ASVs in dataset 
+# AFTER TRIM
+data.frame(Seq_Length = nchar(getSequences(raw_ASV_table_trimmed))) %>%
+  ggplot(aes(x = Seq_Length )) + 
+  geom_histogram() + 
+  labs(title = "Trimmed distribution of ASV length")
+# Note the peak at 465 is ABOVE 3000
+```
+
+# Remove Chimeras
+
+```{r rm_chimeras, fig.width=3.5, fig.height=3}
+# Remove the chimeras in the raw ASV table
+noChimeras_ASV_table <- removeBimeraDenovo(raw_ASV_table_trimmed, 
+                                           method="consensus", 
+                                           multithread=TRUE, verbose=TRUE)
+
+# Check the dimensions
+dim(noChimeras_ASV_table)
+
+# What proportion is left of the sequences? 
+sum(noChimeras_ASV_table)/sum(raw_ASV_table_trimmed)
+sum(noChimeras_ASV_table)/sum(raw_ASV_table)
+
+# Plot it 
+data.frame(Seq_Length_NoChim = nchar(getSequences(noChimeras_ASV_table))) %>%
+  ggplot(aes(x = Seq_Length_NoChim )) + 
+  geom_histogram()+ 
+  labs(title = "Trimmed + Chimera Removal distribution of ASV length")
+# Note the difference in the peak at 465, which is now BELOW 3000
+```
+
+# Track the read counts
+
+Here, we will look at the number of reads that were lost in the filtering, denoising, merging, and chimera removal. 
+```{r track_reads, fig.width=6, fig.height=4}
+# A little function to identify number seqs 
+getN <- function(x) sum(getUniques(x))
+
+# Make the table to track the seqs 
+track <- cbind(filtered_reads, 
+               sapply(dada_forward, getN),
+               sapply(dada_reverse, getN),
+               sapply(merged_ASVs, getN),
+               rowSums(noChimeras_ASV_table))
+
+head(track)
+
+# Update column names to be more informative (most are missing at the moment!)
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nochim")
+rownames(track) <- samples
+
+# Generate a dataframe to track the reads through our DADA2 pipeline
+track_counts_df <- 
+  track %>%
+  # make it a dataframe
+  as.data.frame() %>%
+  rownames_to_column(var = "names") %>%
+  mutate(perc_reads_retained = 100 * nochim / input)
+
+# Visualize it in table format 
+DT::datatable(track_counts_df)
+
+# Plot it!
+track_counts_df %>%
+  pivot_longer(input:nochim, names_to = "read_type", values_to = "num_reads") %>%
+  mutate(read_type = fct_relevel(read_type, 
+                                 "input", "filtered", "denoisedF", "denoisedR", "merged", "nochim")) %>%
+  ggplot(aes(x = read_type, y = num_reads, fill = read_type)) + 
+  geom_line(aes(group = names), color = "grey") + 
+  geom_point(shape = 21, size = 3, alpha = 0.8) + 
+  scale_fill_brewer(palette = "Spectral") + 
+  labs(x = "Filtering Step", y = "Number of Sequences") + 
+  theme_bw()
+```
+
+# Assign Taxonomy 
+
+Here, we will use the silva database version 138!
+```{r assign-tax}
+# Classify the ASVs against a reference set using the RDP Naive Bayesian Classifier described by Wang et al., (2007) in AEM
+taxa_train <- 
+  assignTaxonomy(noChimeras_ASV_table, 
+                 "/workdir/in_class_data/taxonomy/silva_nr99_v138.1_train_set.fa.gz", 
+                 multithread=TRUE)
+
+# Add the genus/species information 
+taxa_addSpecies <- 
+  addSpecies(taxa_train, 
+             "/workdir/in_class_data/taxonomy/silva_species_assignment_v138.1.fa.gz")
+
+# Inspect the taxonomy 
+taxa_print <- taxa_addSpecies 
+# Removing sequence rownames for display only
+
+rownames(taxa_print) <- NULL
+#View(taxa_print)
+```
+
+# Prepare the data for export! 
+
+## 1. ASV Table 
+
+Below, we will prepare the following: 
+
+1. Two ASV Count tables: 
+      a. With ASV seqs: ASV headers include the *entire* ASV sequence ~250bps.
+      b. with ASV names: This includes re-written and shortened headers like ASV_1, ASV_2, etc, which will match the names in our fasta file below.  
+2. `ASV_fastas`: A fasta file that we can use to build a tree for phylogenetic analyses (e.g. phylogenetic alpha diversity metrics or UNIFRAC dissimilarty).  
+
+### Finalize ASV Count Tables 
+
+```{r prepare-ASVcount-table}
+########### 2. COUNT TABLE ###############
+############## Modify the ASV names and then save a fasta file!  ############## 
+# Give headers more manageable names
+# First pull the ASV sequences
+asv_seqs <- colnames(noChimeras_ASV_table)
+asv_seqs[1:5]
+
+# make headers for our ASV seq fasta file, which will be our asv names
+asv_headers <- vector(dim(noChimeras_ASV_table)[2], mode = "character")
+asv_headers[1:5]
+
+# loop through vector and fill it in with ASV names 
+for (i in 1:dim(noChimeras_ASV_table)[2]) {
+  asv_headers[i] <- paste(">ASV", i, sep = "_")
+}
+
+# intitution check
+asv_headers[1:5]
+
+##### Rename ASVs in table then write out our ASV fasta file! 
+#View(noChimeras_ASV_table)
+asv_tab <- t(noChimeras_ASV_table)
+#View(asv_tab)
+
+## Rename our asvs! 
+row.names(asv_tab) <- sub(">", "", asv_headers)
+#View(asv_tab)
+```
+
+## 2. Taxonomy Table 
+
+```{r prepare-tax-table}
+# Inspect the taxonomy table
+#View(taxa_addSpecies)
+
+##### Prepare tax table 
+# Add the ASV sequences from the rownames to a column 
+new_tax_tab <- 
+  taxa_addSpecies%>%
+  as.data.frame() %>%
+  rownames_to_column(var = "ASVseqs") 
+head(new_tax_tab)
+
+# intution check 
+stopifnot(new_tax_tab$ASVseqs == colnames(noChimeras_ASV_table))
+
+# Now let's add the ASV names 
+rownames(new_tax_tab) <- rownames(asv_tab)
+head(new_tax_tab)
+
+### Final prep of tax table. Add new column with ASV names 
+asv_tax <- 
+  new_tax_tab %>%
+  # add rownames from count table for phyloseq handoff
+  mutate(ASV = rownames(asv_tab)) %>%
+  # Resort the columns with select
+  dplyr::select(Kingdom, Phylum, Class, Order, Family, Genus, Species, ASV, ASVseqs)
+
+head(asv_tax)
+
+# Intution check
+stopifnot(asv_tax$ASV == rownames(asv_tax), rownames(asv_tax) == rownames(asv_tab))
+```
+
+# Write `01_DADA2` files
+
+Now, we will write the files! We will write the following to the `data/01_DADA2/` folder. We will save both as files that could be submitted as supplements AND as .RData objects for easy loading into the next steps into R.:  
+
+1. `ASV_counts.tsv`: ASV count table that has ASV names that are re-written and shortened headers like ASV_1, ASV_2, etc, which will match the names in our fasta file below. This will also be saved as `data/01_DADA2/ASV_counts.RData`.`    
+2. `ASV_counts_withSeqNames.tsv`: This is generated with the data object in this file known as `noChimeras_ASV_table`. ASV headers include the *entire* ASV sequence ~450bps.  In addition, we will save this as a .RData object as `data/01_DADA2/noChimeras_ASV_table.RData` as we will use this data in `analysis/02_Taxonomic_Assignment.Rmd` to assign the taxonomy from the sequence headers.  
+3. `ASVs.fasta`: A fasta file output of the ASV names from `ASV_counts.tsv` and the sequences from the ASVs in `ASV_counts_withSeqNames.tsv`. A fasta file that we can use to build a tree for phylogenetic analyses (e.g. phylogenetic alpha diversity metrics or UNIFRAC dissimilarty).  
+4. We will also make a copy of `ASVs.fasta` in `data/02_TaxAss_FreshTrain/` to be used for the taxonomy classification in the next step in the workflow.  
+5. Write out the taxonomy table
+6. `track_read_counts.RData`: To track how many reads we lost throughout our workflow that could be used and plotted later. We will add this to the metadata in `analysis/02_Taxonomic_Assignment.Rmd`.   
+
+
+```{r save-files}
+# FIRST, we will save our output as regular files, which will be useful later on. 
+# Save to regular .tsv file 
+# Write BOTH the modified and unmodified ASV tables to a file!
+# Write count table with ASV numbered names (e.g. ASV_1, ASV_2, etc)
+write.table(asv_tab, "data/01_DADA2/ASV_counts.tsv", sep = "\t", quote = FALSE, col.names = NA)
+# Write count table with ASV sequence names
+write.table(noChimeras_ASV_table, "data/01_DADA2/ASV_counts_withSeqNames.tsv", sep = "\t", quote = FALSE, col.names = NA)
+# Write out the fasta file for reference later on for what seq matches what ASV
+asv_fasta <- c(rbind(asv_headers, asv_seqs))
+# Save to a file!
+write(asv_fasta, "data/01_DADA2/ASVs.fasta")
+
+
+# SECOND, let's save the taxonomy tables 
+# Write the table 
+write.table(asv_tax, "data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", quote = FALSE, col.names = NA)
+
+
+# THIRD, let's save to a RData object 
+# Each of these files will be used in the analysis/02_Taxonomic_Assignment
+# RData objects are for easy loading :) 
+save(noChimeras_ASV_table, file = "data/01_DADA2/noChimeras_ASV_table.RData")
+save(asv_tab, file = "data/01_DADA2/ASV_counts.RData")
+# And save the track_counts_df a R object, which we will merge with metadata information in the next step of the analysis in Analysis/02_Taxonomic_Assignment. 
+save(track_counts_df, file = "data/01_DADA2/track_read_counts.RData")
+```
+
+# Session Information 
+```{r session-info}
+# Ensure reproducibility
+devtools::session_info()
+```
