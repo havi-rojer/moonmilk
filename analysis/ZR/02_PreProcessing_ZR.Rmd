@@ -213,7 +213,7 @@ seqSums_df %>%
 
 # plot it! 
 seqSums_df %>%
-  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = Cave)) + 
+  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = sample_title)) + 
   geom_bar(stat = "identity") 
 
 # Density plot
