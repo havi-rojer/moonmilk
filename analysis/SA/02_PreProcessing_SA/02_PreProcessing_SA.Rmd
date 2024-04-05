@@ -2,29 +2,32 @@
 title: "02_PreProcessing"
 author: "sophiaaredas"
 date: "`r Sys.Date()`"
-output: html_document
-  toc: yes
-  toc_float:
-    collapsed: no
-    smooth_scroll: yes
-    toc_depth: 3
-editor_options: 
+output:
+  html_document:
+    code_folding: show
+    highlight: default
+    keep_md: yes
+    theme: journal
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      toc_depth: 3
+  pdf_document:
+    toc: yes
+editor_options:
   chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-setwd("/local/workdir/sna49/moon_milk/moonmilk")
-knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/sna49/moon_milk/moonmilk/figures/02_PreProcessing/") # Send any figures to this folder
+#setwd("/local/workdir/sna49/moon_milk/moonmilk/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/sna49/moon_milk/moonmilk/figures/02_PreProcessing_SA") # Send any figures to this folder
 ```
 
 ## Load libraries 
 ```{r load-libraries}
-
-library(pacman)
-
-pacman::p_load(tidyverse, BiocManager, devtools, dada2, 
-               phyloseq, patchwork, iNEXT, vegan,
-               install = FALSE)
+#devtools::install_github("joey711/phyloseq")
+pacman::p_load(devtools, phyloseq, tidyverse, dada2, install = FALSE)
 ```
 
 ## Goals
@@ -56,8 +59,8 @@ load("/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/ASV_counts.RData")
 head(asv_tab)[,1:5]
 
 # Fix names 
-sample_names <- colnames(asv_tab)
-samples_fixed <- sapply(strsplit(basename(sample_names), "_"), `[`,1) 
+sample_titles <- colnames(asv_tab)
+samples_fixed <- sapply(strsplit(basename(sample_titles), "_"), `[`,1) 
 head(samples_fixed)
 
 # re-write the ASV count file to fix names 
@@ -96,8 +99,11 @@ dim(metadata_df)
 colnames(metadata_df)
 # Replace the name of the column
 colnames(metadata_df)[1] <- "names"
+print(metadata_df)
+# Add column with cave_name
+metadata_df <- separate(metadata_df, sample_title, into = c("cave", "sample"), sep = "-")  
 
-head(metadata_df)
+print(metadata_df)
 head(track_counts_df)
 
 metadata_track_reads_df <- 
@@ -134,7 +140,7 @@ raw_physeq <- phyloseq(otu_table(asv_tab, taxa_are_rows = TRUE),
 raw_physeq
 
 # Save this raw phyloseq object 
-save(raw_physeq, file = "data/02_PreProcessing/raw_physeq.RData")
+save(raw_physeq, file = "/local/workdir/sna49/moon_milk/moonmilk/data/02_PreProcessing/raw_physeq.RData")
 ```
 
 ## Clean up the data
@@ -183,21 +189,17 @@ ntaxa(noChlorosMitos_physeq)/ntaxa(raw_physeq)
 
 # Evaulate and remove the control samples 
 
-Take a look at the negative controls and then make a decision about whether or not to remove the ASVs that we found in our controls 
-
-1. Negative controls: We do not have negative controls so we are skipping this
-2. ASVs found within the negative controls and their distribution in the samples. 
-3. Evaluate the mock community 
+We do not have any control samples or a mock community.
 
 # Evaluate the Sequencing Depth 
 
 ```{r seq-depth}
-# The current data objec
-noControlsMitos
+# The current data object
+noChlorosMitos_physeq
 
 # What is the library size/sequencing depth for each sample? 
 seqSums_df <- 
-  noControlsMock_ChlorosMitos_physeq %>%
+  noChlorosMitos_physeq %>%
   otu_table() %>%
   # Sum each sample column 
   colSums() %>%
@@ -220,13 +222,13 @@ seqSums_df %>%
 
 # plot it! 
 seqSums_df %>%
-  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs,
-             fill = station)) + 
+  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = cave)) + 
   geom_bar(stat = "identity") 
 
-# Density plot 
+# Density plot
+
 seqSums_df %>%
-  ggplot(aes(TotalSeqs, fill = station)) +
+  ggplot(aes(TotalSeqs, fill = cave)) +
   geom_density(alpha = 0.5)
 ```
 
@@ -234,22 +236,20 @@ seqSums_df %>%
 
 ```{r rm-samps}
 # What's the min seq depth? 
-min(sample_sums(noControlsMock_ChlorosMitos_physeq))
+min(sample_sums(noChlorosMitos_physeq))
 
-# Remove 20210615-MA-SCB2F
-raw_preprocessed_physeq <- 
-  noControlsMock_ChlorosMitos_physeq %>%
-  subset_samples(., names != "20210615-MA-SCB2F")
+# We don't have any samples with zero seq depth so we're good
 
-#What's the new min seq depth?
-min(sample_sums(raw_preprocessed_physeq))
+raw_preprocessed_physeq <- noChlorosMitos_physeq
 ```
 
 # Save Preprocessed Phyloseq Object
 ```{r save-physeq}
-save(raw_preprocessed_physeq,
-     file = "data/02_PreProcessing/raw_preprocessed_physeq.RData")
+#set your WD to wherever you wanna put this file
+
+save(raw_preprocessed_physeq, file = "./raw_preprocessed_physeq.RData")
 ```
+
 ## Session Information 
 ```{r session-info}
 # Ensure reproducibility 
