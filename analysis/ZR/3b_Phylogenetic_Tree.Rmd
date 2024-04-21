@@ -1,0 +1,134 @@
+---
+title: "Phylogenetic Tree Inspection & Rooting"
+output: 
+  html_document:
+    css: "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/css/tufte.css"
+    toc: yes
+    toc_float:
+      collapse: no
+      smooth_scroll: yes
+      toc_depth: 3
+date: "`r Sys.Date()`"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+setwd("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/analysis/ZR/figures/03_Phylogenetic_Tree/") # Send any figures to this folder
+```
+
+# Goals 
+
+1. Load the fastree unrooted tree.  
+2. Add tree to phyloseq object.  
+3. Visualize and inspect tree with ggtree. 
+4. Prune ASVs, if needed.  
+5. Root our tree. 
+6. Combine new tree with a phyloseq object. 
+7. Save 2 phyloseq objects: 1. Unrooted tree phyloseq object, 2. Rooted tree phyloseq object. 
+
+# Before you start
+
+## Set my seed 
+```{r set-seed}
+# Any number can be chosen 
+set.seed(238428)
+```
+
+
+## Load Packages 
+```{r load-packages}
+pacman::p_load(tidyverse, phyloseq, ggtree, phytools,
+               install = FALSE)
+```
+
+## Load Data files 
+```{r load-data}
+# Preprocessed phyloseq object 
+load("data/02_PreProcessing/raw_preprocessed_physeq.RData")
+raw_preprocessed_physeq
+
+# Load in the tree! 
+unrooted_tree <- read.tree("data/03_Phylogenetic_Tree/ASVs_unrooted.tree")
+unrooted_tree
+str(unrooted_tree)
+```
+
+# Merge Phyloseq 
+```{r merge-physeq}
+# Intuition check 
+stopifnot(ntaxa(raw_preprocessed_physeq) == ntaxa(unrooted_tree))
+
+# Merge the tree with the phyloseq object 
+unrooted_physeq <- 
+  merge_phyloseq(raw_preprocessed_physeq, unrooted_tree)
+unrooted_physeq
+```
+
+# Plot Tree with `ggtree`
+
+```{r plot-tree-unrooted}
+# Make a basic tree
+kingdom_tree <- 
+  ggtree(unrooted_physeq) + 
+  # color tips by kingdom 
+  geom_tippoint(size = 0.1, mapping = aes(color = Phylum)) +
+  # Add title 
+  labs(title = "Unrooted Tree") + 
+  #move the legend to the bottom 
+  theme(legend.position = "bottom"); kingdom_tree
+
+kingdom_node_tree <- 
+  kingdom_tree + 
+  # Add the node label 
+  geom_text(aes(label=node), hjust= -2, vjust = 1, size = 0.5)
+kingdom_node_tree
+```
+
+
+# Evaluate Long Branch 
+
+This part gets a bit manual 
+
+```{r eval-long-branch}
+# View a specific clade 
+# Zoom in on origin tree: Node 3397
+viewClade(kingdom_node_tree + 
+          labs(title = "Unrooted Tree: Node 3397"), 
+          node = 3397)
+```
+
+We looked at this node on a Phylum level and it appears that *only* the long branch has consistently annotated phyla. Super weird. 
+
+# Midroot Tree
+```{r midroot-tree}
+# Is the tree rooted?
+new_unrooted_tree <-phy_tree(unrooted_physeq)
+is.rooted(new_unrooted_tree)
+
+# Let's midpoint root the tree
+midpoint_rooted_tree <- midpoint.root(new_unrooted_tree)
+
+# Is the new tree rooted?
+is.rooted(midpoint_rooted_tree)
+
+# Assign to a new phyloseq object: merging subsetted phyloseq with the new rooted tree
+
+# Merge tree with the new physeq_rm456
+midroot_physeq <- 
+  merge_phyloseq(raw_preprocessed_physeq, midpoint_rooted_tree)
+midroot_physeq
+
+# Quick inspection of tree 
+ggtree(midroot_physeq) + 
+  geom_tippoint(mapping = aes(color = Phylum))
+```
+
+
+# Save to a new phyloseq object
+```{r save-physeq}
+# Save both phyloseq objects with our tree object to one .RData file 
+save(list = c("unrooted_physeq_rm456", "midroot_physeq_rm456"),
+     file = "data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
+```
