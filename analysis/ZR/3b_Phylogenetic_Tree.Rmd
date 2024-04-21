@@ -14,8 +14,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-setwd("/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis")
-knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/analysis/ZR/figures/03_Phylogenetic_Tree/") # Send any figures to this folder
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "biomi6300_moonmilk_amplicon_analysis/analysis/ZR/figures/03_Phylogenetic_Tree/") # Send any figures to this folder
 ```
 
 # Goals 
@@ -73,7 +72,7 @@ unrooted_physeq
 kingdom_tree <- 
   ggtree(unrooted_physeq) + 
   # color tips by kingdom 
-  geom_tippoint(size = 0.1, mapping = aes(color = Phylum)) +
+  geom_tippoint(size = 0.1, mapping = aes(color = Kingdom)) +
   # Add title 
   labs(title = "Unrooted Tree") + 
   #move the legend to the bottom 
@@ -84,6 +83,21 @@ kingdom_node_tree <-
   # Add the node label 
   geom_text(aes(label=node), hjust= -2, vjust = 1, size = 0.5)
 kingdom_node_tree
+
+phylum_tree <- 
+  ggtree(unrooted_physeq) + 
+  # color tips by phylum 
+  geom_tippoint(size = 0.1, mapping = aes(color = Phylum)) +
+  # Add title 
+  labs(title = "Unrooted Tree") + 
+  #move the legend to the bottom 
+  theme(legend.position = "none"); phylum_tree
+
+phylum_node_tree <- 
+  phylum_tree + 
+  # Add the node label 
+  geom_text(aes(label=node), hjust= -2, vjust = 1, size = 0.5)
+phylum_node_tree
 ```
 
 
@@ -94,7 +108,7 @@ This part gets a bit manual
 ```{r eval-long-branch}
 # View a specific clade 
 # Zoom in on origin tree: Node 3397
-viewClade(kingdom_node_tree + 
+viewClade(phylum_node_tree + 
           labs(title = "Unrooted Tree: Node 3397"), 
           node = 3397)
 ```
@@ -125,10 +139,9 @@ ggtree(midroot_physeq) +
   geom_tippoint(mapping = aes(color = Phylum))
 ```
 
-
 # Save to a new phyloseq object
 ```{r save-physeq}
 # Save both phyloseq objects with our tree object to one .RData file 
-save(list = c("unrooted_physeq_rm456", "midroot_physeq_rm456"),
+save(list = c("unrooted_physeq", "midroot_physeq"),
      file = "data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
 ```
