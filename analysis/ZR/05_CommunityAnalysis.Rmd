@@ -15,5 +15,242 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      fig.path = "../figures/05_CommunityAnalysis")
+                      fig.path = "../figures/05_CommunityAnalysis/")
+```
+
+# Goals 
+
+1. Load in phyloseq data with rooted tree.  
+2. Evaluate sequencing depth and remove sample.  
+3. Normalize the read counts between samples.  
+4. Calculate community dissimilarities. Numbers between 0 and 1. If 0, completely similar versus if they are 1, then they're completely dissimilar.   
+    a. **Sorensen**: Shared Species as a binary value: Abundance-unweighted 
+    b. **Bray-Curtis**: Shared Abundant species: Abundance-weighted
+    c. **(Abundance-)Weighted UNIFRAC**: Consider Abundant Species and where they fall on the tree  
+5. Visualize the community data with two unconstrained Ordinations:  
+    a. **PCoA**: Linear Method. Eigenvalue = how much variation is explained by each axis. Choose to view axis 1, 2, 3, etc. and plot them together.  
+    b. **NMDS**: Non-linear. Smush multiple Dimensions into 2 or 3 axes. Need to report Stress value (ideally <0.15).  
+6. Run statistics with PERMANOVA and betadispR. 
+
+
+# Setup 
+
+## Set the seed 
+```{r set-seed}
+# Any number can be chosen 
+set.seed(238428)
+```
+
+## Load Libraries
+```{r load-libraries}
+#install.packages("vegan")
+pacman::p_load(tidyverse, devtools, phyloseq, patchwork, vegan,
+               install = FALSE)
+```
+
+## Load Data 
+```{r load-physeq}
+# Load in rooted phylogenetic tree! 
+load("data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
+midroot_physeq
+unrooted_physeq
+```
+
+# Explore Read Counts 
+
+## Raw read depth 
+```{r calc-seq-depth}
+# Calculate the total number of reads per sample. 
+raw_TotalSeqs_df  <- 
+  midroot_physeq %>%
+  # calculate the sample read sums 
+  sample_sums() %>%
+  data.frame()
+# name the column 
+colnames(raw_TotalSeqs_df)[1] <- "TotalSeqs"
+  
+head(raw_TotalSeqs_df)
+
+# make histogram of raw reads 
+raw_TotalSeqs_df %>%
+  ggplot(aes(x = TotalSeqs)) + 
+  geom_histogram(bins = 50) + 
+  scale_x_continuous(limits = c(0, 10000)) + 
+  labs(title = "Raw Sequencing Depth Distribution") + 
+  theme_classic()
+```
+
+## Normalize read counts  
+```{r scale-reads}
+### scale_reads function
+#################################################################################### 
+# Function to scale reads: http://deneflab.github.io/MicrobeMiseq/ 
+# Scales reads by 
+# 1) taking proportions
+# 2) multiplying by a given library size of n
+# 3) rounding 
+# Default for n is the minimum sample size in your library
+# Default for round is floor
+
+matround <- function(x){trunc(x+0.5)}
+
+scale_reads <- function(physeq, n = min(sample_sums(physeq)), round = "round") {
+  
+  # transform counts to n
+  physeq.scale <- transform_sample_counts(physeq, function(x) {(n * x/sum(x))})
+  
+  # Pick the rounding functions
+  if (round == "floor"){
+    otu_table(physeq.scale) <- floor(otu_table(physeq.scale))
+  } else if (round == "round"){
+    otu_table(physeq.scale) <- round(otu_table(physeq.scale))
+  } else if (round == "matround"){
+    otu_table(physeq.scale) <- matround(otu_table(physeq.scale))
+  }
+  
+  # Prune taxa and return new phyloseq object
+  physeq.scale <- prune_taxa(taxa_sums(physeq.scale) > 0, physeq.scale)
+  return(physeq.scale)
+}
+```
+
+## Scale the reads and check the distribution of the seq depth 
+
+This is where one might decide use rarefaction to normalize data. 
+```{r scale-physeq}
+min(sample_sums(midroot_physeq))
+
+# Scale reads by the above function
+scaled_rooted_physeq <- 
+  midroot_physeq %>%
+  scale_reads(round = "matround")
+
+# Calculate the read depth 
+scaled_TotalSeqs_df <- 
+  scaled_rooted_physeq %>%
+  sample_sums() %>%
+  data.frame()
+colnames(scaled_TotalSeqs_df)[1] <-"TotalSeqs"
+
+# Inspect
+head(scaled_TotalSeqs_df)
+
+# Check the range of the data 
+min_seqs <- min(scaled_TotalSeqs_df$TotalSeqs); min_seqs
+max_seqs <- max(scaled_TotalSeqs_df$TotalSeqs); max_seqs
+# range
+max_seqs - min_seqs
+
+# Plot Histogram 
+scaled_TotalSeqs_df %>%
+  ggplot(aes(x = TotalSeqs)) + 
+  geom_histogram(bins = 50) + 
+  scale_x_continuous(limits = c(0, 10000)) + 
+  labs(title = "Scaled Sequencing Depth at 2194") + 
+  theme_classic()
+```
+
+# Cacluate & Visualize community dissimilarity 
+
+Exploratory analyses from Paliy & Shankar (2016) paper, which is using unconstrained ordination methods like PCoA. 
+
+## PCoA 
+
+### Sorensen
+```{r sorensen-PCoA}
+# Calculate sorensen dissimilarity: Abundance-unweighted of shared taxa
+scaled_soren_pcoa <-  
+  ordinate(
+    physeq = scaled_rooted_physeq,
+    method = "PCoA",
+    distance = "bray", binary = TRUE)
+
+#str(scaled_soren_pcoa)
+
+# Plot the ordination 
+soren_cave_pcoa <- plot_ordination(
+  physeq = scaled_rooted_physeq,
+  ordination = scaled_soren_pcoa, 
+  color = "cave",
+  title = "Sorensen PCoA Colored by Cave") +
+  geom_point(size=5, alpha = 0.5, aes(color = cave)) +
+  theme_bw()
+
+# Show the plot 
+soren_cave_pcoa
+```
+
+
+### Bray
+```{r bray-PCoA}
+# Calculate sorensen dissimilarity: Abundance-unweighted of shared taxa
+scaled_bray_pcoa <-  
+  ordinate(
+    physeq = scaled_rooted_physeq,
+    method = "PCoA",
+    distance = "bray")
+
+#str(scaled_soren_pcoa)
+
+# Plot the ordination 
+bray_cave_pcoa <- plot_ordination(
+  physeq = scaled_rooted_physeq,
+  ordination = scaled_soren_pcoa, 
+  color = "cave",
+  title = "Bray PCoA Colored by Cave") +
+  geom_point(size=5, alpha = 0.5, aes(color = cave)) +
+  theme_bw()
+
+# Show the plot 
+bray_cave_pcoa
+```
+
+### Weighted Unifrac
+
+```{r Weighted-Unifrac-PCoA}
+# Calculate sorensen dissimilarity: Abundance-unweighted of shared taxa
+scaled_Weighted_Unifrac_pcoa <-  
+  ordinate(
+    physeq = scaled_rooted_physeq,
+    method = "PCoA",
+    distance = "wunifrac")
+
+#str(scaled_soren_pcoa)
+
+# Plot the ordination 
+scaled_Weighted_Unifrac_pcoa <- plot_ordination(
+  physeq = scaled_rooted_physeq,
+  ordination = scaled_soren_pcoa, 
+  color = "cave",
+  title = "Weighted Unifrac PCoA Colored by Cave") +
+  geom_point(size=5, alpha = 0.5, aes(color = cave)) +
+  theme_bw()
+
+# Show the plot 
+scaled_Weighted_Unifrac_pcoa
+```
+
+```{r wUnifrac-NMDS}
+# Calculate the Weighted Unifrac distance
+scaled_wUNI_nmds <- 
+  ordinate(
+    physeq = scaled_rooted_physeq,
+    method = "NMDS",
+    distance = "wunifrac")
+
+# Plot the PCoA
+wUNI_cave_nmds <- 
+  plot_ordination(
+    physeq = scaled_rooted_physeq,
+    ordination = scaled_wUNI_nmds,
+    color = "cave",
+    title = "Weighted Unifrac NMDS Colored by Cave") +
+  geom_point(size=5, alpha = 0.5, aes(color = cave)) +
+  theme_bw()
+wUNI_cave_nmds
+```
+
+```{r combined-wUnifrac, fig.width=6, fig.height=3.5}
+(scaled_Weighted_Unifrac_pcoa + theme(legend.position = "none")) + 
+  (wUNI_cave_nmds + theme(legend.position = "none"))
 ```
