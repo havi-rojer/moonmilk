@@ -1,0 +1,19 @@
+---
+title: "Between Sample (Beta) Diversity of Microbes"
+output: 
+  html_document:
+    css: "/local/workdir/zlr6/git_repos/biomi6300_moonmilk_amplicon_analysis/css/tufte.css"
+    toc: yes
+    toc_float:
+      collapse: no
+      smooth_scroll: yes
+      toc_depth: 3
+date: "`r Sys.Date()`"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.path = "../figures/05_CommunityAnalysis")
+```
