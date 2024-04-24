@@ -115,10 +115,39 @@ viewClade(phylum_node_tree +
 
 We looked at this node on a Phylum level and it appears that *only* the long branch has consistently annotated phyla. Super weird. 
 
+## Prune ASVs whose Phylum = NA
+
+```{r prune-NA}
+# Function from Joey McMurdie: https://github.com/joey711/phyloseq/issues/652
+pop_taxa = function(physeq, badTaxa){
+  allTaxa <-  taxa_names(physeq)
+  allTaxa <- allTaxa[!(allTaxa %in% badTaxa)]
+  return(prune_taxa(allTaxa, physeq))}
+
+# string of ASVs whose phylum = NA
+na_asvs <- unrooted_physeq %>%
+  tax_table() %>%
+  data.frame() %>%
+  dplyr::filter(is.na(Phylum)) %>%
+  pull(ASV)
+
+# Convert the vector of ASV names to a single string
+na_asvs
+
+# Let's use the pop_taxa function :) 
+# Recreate a phyloseq object without ASV_456
+unrooted_physeq_rmNA <- 
+  unrooted_physeq %>%
+  pop_taxa(., na_asvs)
+
+# Intuition Check
+ntaxa(unrooted_physeq) - ntaxa(unrooted_physeq_rmNA) 
+```
+
 # Midroot Tree
 ```{r midroot-tree}
 # Is the tree rooted?
-new_unrooted_tree <-phy_tree(unrooted_physeq)
+new_unrooted_tree <-phy_tree(unrooted_physeq_rmNA)
 is.rooted(new_unrooted_tree)
 
 # Let's midpoint root the tree
@@ -142,6 +171,6 @@ ggtree(midroot_physeq) +
 # Save to a new phyloseq object
 ```{r save-physeq}
 # Save both phyloseq objects with our tree object to one .RData file 
-save(list = c("unrooted_physeq", "midroot_physeq"),
+save(list = c("unrooted_physeq_rmNA", "midroot_physeq"),
      file = "data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
 ```
