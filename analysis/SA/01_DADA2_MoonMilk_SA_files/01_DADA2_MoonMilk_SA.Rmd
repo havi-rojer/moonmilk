@@ -1,5 +1,5 @@
 ---
-title: "DADA2_MoonMilk_SA"
+title: "01_DADA2_MoonMilk_SA"
 author: "sophiaaredas"
 date: "`r Sys.Date()`"
 output: html_document
@@ -8,7 +8,7 @@ editor_options:
 ---
 # Load Libraries 
 ```{r}
-install.packages("pacman")
+#install.packages("pacman")
 
 pacman::p_load(tidyverse, BiocManager, devtools, dada2, 
                phyloseq, patchwork, DT, iNEXT, vegan,
@@ -407,7 +407,7 @@ data.frame(Seq_Length = nchar(getSequences(raw_ASV_table))) %>%
 # 249 originates from our expected amplicon of 252 - 3bp in the forward read due to low quality.
 
 # We will allow for a few 
-raw_ASV_table_trimmed <- raw_ASV_table[,nchar(colnames(raw_ASV_table)) %in% 248:250]
+raw_ASV_table_trimmed <- raw_ASV_table[,nchar(colnames(raw_ASV_table)) %in% 440:466]
 
 # Inspect the distribution of sequence lengths of all ASVs in dataset 
 table(nchar(getSequences(raw_ASV_table_trimmed)))
@@ -421,21 +421,21 @@ data.frame(Seq_Length = nchar(getSequences(raw_ASV_table_trimmed))) %>%
   ggplot(aes(x = Seq_Length )) + 
   geom_histogram() + 
   labs(title = "Trimmed distribution of ASV length")
-# Note the peak at 249 is ABOVE 3000
+
 
 # Let's zoom in on the plot 
 data.frame(Seq_Length = nchar(getSequences(raw_ASV_table_trimmed))) %>%
   ggplot(aes(x = Seq_Length )) + 
   geom_histogram() + 
   labs(title = "Trimmed distribution of ASV length") + 
-  scale_y_continuous(limits = c(0, 500))
+  scale_y_continuous(limits = c(0, 5500))
 ```
 
 Taking into account the lower, zoomed-in plot. Do we want to remove those extra ASVs?
 
 # We will allow for a few 
 ```{r}
-raw_ASV_table_trimmed <- raw_ASV_table[,nchar(colnames(raw_ASV_table)) %in% 248:250]
+raw_ASV_table_trimmed <- raw_ASV_table[,nchar(colnames(raw_ASV_table)) %in% 440:466]
 ```
 
 # Inspect the distribution of sequence lengths of all ASVs in dataset 
@@ -465,11 +465,8 @@ data.frame(Seq_Length = nchar(getSequences(raw_ASV_table_trimmed))) %>%
   ggplot(aes(x = Seq_Length )) + 
   geom_histogram() + 
   labs(title = "Trimmed distribution of ASV length") + 
-  scale_y_continuous(limits = c(0, 500))
+  scale_y_continuous(limits = c(0, 5500))
 ```
-
-Taking into account the lower, zoomed-in plot. Do we want to remove those extra ASVs?
-
 
 # Remove Chimeras
 
@@ -493,13 +490,14 @@ sum(noChimeras_ASV_table)/sum(raw_ASV_table_trimmed)
 sum(noChimeras_ASV_table)/sum(raw_ASV_table)
 
 # Plot it 
-data.frame(Seq_Length_NoChim = nchar(getSequences(noChimeras_ASV_table))) %>%
+p1 <-
+  data.frame(Seq_Length_NoChim = nchar(getSequences(noChimeras_ASV_table))) %>%
   ggplot(aes(x = Seq_Length_NoChim )) + 
   geom_histogram()+ 
   labs(title = "Trimmed + Chimera Removal distribution of ASV length")
-# Note the difference in the peak at 249, which is now BELOW 3000
-```
 
+p1
+```
 
 
 # Track the read counts
@@ -655,7 +653,7 @@ stopifnot(asv_tax$ASV == rownames(asv_tax), rownames(asv_tax) == rownames(asv_ta
 Now, we will write the files! We will write the following to the `data/01_DADA2/` folder. We will save both as files that could be submitted as supplements AND as .RData objects for easy loading into the next steps into R.:  
 
 1. `ASV_counts.tsv`: ASV count table that has ASV names that are re-written and shortened headers like ASV_1, ASV_2, etc, which will match the names in our fasta file below. This will also be saved as `data/01_DADA2/ASV_counts.RData`.
-2. `ASV_counts_withSeqNames.tsv`: This is generated with the data object in this file known as `noChimeras_ASV_table`. ASV headers include the *entire* ASV sequence ~250bps.  In addition, we will save this as a .RData object as `data/01_DADA2/noChimeras_ASV_table.RData` as we will use this data in `analysis/02_Taxonomic_Assignment.Rmd` to assign the taxonomy from the sequence headers.  
+2. `ASV_counts_withSeqNames.tsv`: This is generated with the data object in this file known as `noChimeras_ASV_table`. ASV headers include the *entire* ASV sequence ~450ishbps.  In addition, we will save this as a .RData object as `data/01_DADA2/noChimeras_ASV_table.RData` as we will use this data in `analysis/02_Taxonomic_Assignment.Rmd` to assign the taxonomy from the sequence headers.  
 3. `ASVs.fasta`: A fasta file output of the ASV names from `ASV_counts.tsv` and the sequences from the ASVs in `ASV_counts_withSeqNames.tsv`. A fasta file that we can use to build a tree for phylogenetic analyses (e.g. phylogenetic alpha diversity metrics or UNIFRAC dissimilarty).  
 4. We will also make a copy of `ASVs.fasta` in `data/02_TaxAss_FreshTrain/` to be used for the taxonomy classification in the next step in the workflow.  
 5. Write out the taxonomy table
@@ -667,9 +665,9 @@ Now, we will write the files! We will write the following to the `data/01_DADA2/
 # Save to regular .tsv file 
 # Write BOTH the modified and unmodified ASV tables to a file!
 # Write count table with ASV numbered names (e.g. ASV_1, ASV_2, etc)
-write.table(asv_tab, "data/01_DADA2/ASV_counts.tsv", sep = "\t", quote = FALSE, col.names = NA)
+write.table(asv_tab, "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/ASV_counts.tsv", sep = "\t", quote = FALSE, col.names = NA)
 # Write count table with ASV sequence names
-write.table(noChimeras_ASV_table, "data/01_DADA2/ASV_counts_withSeqNames.tsv", sep = "\t", quote = FALSE, col.names = NA)
+write.table(noChimeras_ASV_table, "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/ASV_counts_withSeqNames.tsv", sep = "\t", quote = FALSE, col.names = NA)
 # Write out the fasta file for reference later on for what seq matches what ASV
 asv_fasta <- c(rbind(asv_headers, asv_seqs))
 # Save to a file!
@@ -678,26 +676,16 @@ write(asv_fasta, "data/01_DADA2/ASVs.fasta")
 
 # SECOND, let's save the taxonomy tables 
 # Write the table 
-write.table(asv_tax, "data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", quote = FALSE, col.names = NA)
+write.table(asv_tax, "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", quote = FALSE, col.names = NA)
 
 
 # THIRD, let's save to a RData object 
 # Each of these files will be used in the analysis/02_Taxonomic_Assignment
 # RData objects are for easy loading :) 
-save(noChimeras_ASV_table, file = "data/01_DADA2/noChimeras_ASV_table.RData")
-save(asv_tab, file = "data/01_DADA2/ASV_counts.RData")
+save(noChimeras_ASV_table, file = "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/noChimeras_ASV_table.RData")
+save(asv_tab, file = "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/ASV_counts.RData")
 # And save the track_counts_df a R object, which we will merge with metadata information in the next step of the analysis in nalysis/02_Taxonomic_Assignment. 
-save(track_counts_df, file = "data/01_DADA2/track_read_counts.RData")
+save(track_counts_df, file = "/local/workdir/sna49/moon_milk/moonmilk/data/01_DADA2/track_read_counts.RData")
 ```
 
-# Check Render Time
-```{r stop-time}
-# Take the time now that we are at the end of the script
-end_time <- Sys.time()
-end_time 
-
-# Echo the elapsed time
-elapsed_time <- round((end_time - start_time), 3)
-elapsed_time
-```
 # Session Information
