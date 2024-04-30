@@ -100,26 +100,48 @@ phylum_node_tree <-
   geom_text(aes(label=node), hjust= -2, vjust = 1, size = 0.5)
 phylum_node_tree
 ```
-# Evaluate Long Branch 
+# Evaluate the crazy tree 
+This part gets a bit manual
+We will be pruning ASVs whose phylum is NA
+```{r prune-NA-taxa}
+# Function from Joey McMurdie: https://github.com/joey711/phyloseq/issues/652
+pop_taxa = function(physeq, badTaxa){
+  allTaxa <-  taxa_names(physeq)
+  allTaxa <- allTaxa[!(allTaxa %in% badTaxa)]
+  return(prune_taxa(allTaxa, physeq))}
 
-This part gets a bit manual 
+# get rid of NA phylum
+no_asvs<-
+  unrooted_physeq %>% 
+  tax_table() %>% 
+  data.frame() %>% 
+  dplyr::filter(is.na(Phylum)) %>% 
+  pull(ASV)
 
-```{r eval-long-branch}
-# View a specific clade 
-# Zoom in on origin tree: Node 2537
-viewClade(kingdom_node_tree + 
-          labs(title = "Unrooted Tree: Node 3395"), 
-          node = 3397)
+no_asvs
+
+# Function from Joey McMurdie: https://github.com/joey711/phyloseq/issues/652
+pop_taxa = function(physeq, badTaxa){
+  allTaxa <-  taxa_names(physeq)
+  allTaxa <- allTaxa[!(allTaxa %in% badTaxa)]
+  return(prune_taxa(allTaxa, physeq))}
+
+# Let's use the pop_taxa function :) 
+# Recreate a phyloseq object without ASV_456
+unrooted_physeq_rmNA <- 
+  unrooted_physeq %>%
+  pop_taxa(., no_asvs)
+
+#intiution check
+ntaxa(unrooted_physeq) - ntaxa(unrooted_physeq_rmNA)
+
 ```
-
-node 3397 = suspicously long 
-the long brach looks insane but only the long branch has consistently annontated phyla? 
 
 
 # Midroot Tree
 ```{r midroot-tree}
 # Is the tree rooted?
-new_unrooted_tree <-phy_tree(unrooted_physeq)
+new_unrooted_tree <-phy_tree(unrooted_physeq_rmNA)
 is.rooted(new_unrooted_tree)
 
 # Let's midpoint root the tree
