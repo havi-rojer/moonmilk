@@ -1,5 +1,5 @@
 ---
-title: "02_PreProcessing"
+title: "04_PreProcessing"
 author: "sophiaaredas"
 date: "`r Sys.Date()`"
 output:
@@ -160,11 +160,7 @@ Finally, let's draw some conclusions from the plot above (we discussed in class 
 
 1. The best gift of a diversity measure: *All three diversity measures are on the same x-axis: The Effective Number of Species.*  
 2. As q increases from 0 to 1 to 2, the abundance of the species is weighted more, so the rarefaction curve platueaus earlier. **This is important because it indicates that richess is the most sensitive to sequencing depth!** However, Shannon and even less sensitive is Simpson!  
-3. Most of the sample rarefaction curves appear to plateau but we need to look deeper.  
-4. There appears to be a sample with much lower richness than the rest of the dataset. Let's keep our eyes on this sample...  
 
-
-In your analysis, please provide a clear description! 
 
 # Manually plot Diversity 
 
@@ -191,7 +187,7 @@ iNEXT_manual_df %>%
   # Now, let's draw the plot, be sure to group by the samples if using geom_line!
   ggplot(aes(x = m, y= qD, color = cave, group = names)) + 
   geom_line() + 
-  # Facet with the station to see the samples better 
+  # Facet with the cave to see the samples better 
   facet_grid(Order.q~cave, scales = "free") + 
   scale_color_manual(values = cave_colors) + 
   labs(x = "Number of Sequences (Library Size)", 
@@ -204,26 +200,30 @@ iNEXT_manual_df %>%
 ```
 
 
-While the rarefaction curves from `ggiNEXT` agglomerated the data together, it was hard to see individual samples. Above, we can start to tease apart specific samples within each station that appear higher. 
+While the rarefaction curves from `ggiNEXT` agglomerated the data together, it was hard to see individual samples. Above, we can start to tease apart specific samples within each cave that appear higher. 
 
 *Please interpret your results!!*
 
 Some take-aways:  
 
 - Richness:  
-    - The richness is higher in Feta Apei
+    - The richness is higher in Feta Apei 
     - all the other caves have similar but lower richness
+    - in the Ferice cave the samples appear to have an "upper" and "lower" limit and split across ASVs. 
+    - There is one line for the Nestor and Taosaure cave
     
 - Shannon:
-  - 
+  - Feta Apei had the highest number of common taxa.
+  - Then Nestor cave had the second highest amount of common taxa
+  - The lowest amount of common taxa was seen in Taosaure cave. 
+  - The Ferice cave is definitely on the lower end but there is a portion where samples have high amounts of common taxa but there are also samples that plateu early on indicating low number of common taxa in less ASVs (around 100 ASVs according to the bar plot)
     
 - Simpson's Diversity:  
     - Again Feta Apei had the highest simpsons diversity meaning that there are more rare taxa 
+    - This was followed by Nestor cave with the second highest Simpson's index
+    - Ferice cave has samples that are higher which indicate ASVs with more rare taxa around the 200ish ASV amount. But the samples with less ASVs plateu so quickly and have a really flat line indicating lessss rare taxa. 
+    - Taosaure cave also had a lowly abundant amount of rare taxa
     
-- Shannon Diversity
-  - Feta Apei had the highest Shannon 
-  - Tausoare had the loweset Shannon than the other caves
-
 # Boxplots of Diversity 
 
 Now, let's zoom in on a bit of a better view of the data by visualizing it in a boxplot...  
@@ -246,16 +246,17 @@ iNEXT_manual_df %>%
 
 We can draw that:  
 
-- Richness is different between stations it looks significant but we need to tst. Fata Apei has the highest richness. The other caves have similar richness. 
+- Across the board Fata Apei has the highest Richness, Shannon, and Simpson indeces 
 
-- Across teh board Fata Apei has the highest Richness, Shannon, and Simpson
 
-- Ferice cave apears to have the most variation 
-- The lowest shannon and simpson are tausoare indicating that theres fewr common/dominant taxa in comparision to other communities 
+- Richness is different between caves it looks significant but we need to tst. Fata Apei has the highest richness. The other caves have similar but lower richness. 
+
+
+- Ferice cave apears to have the most variation between samples but are lower in Richness, Shannon, and Simpson
+
  
 # Environmental Variable Check 
-We do not have environmental data 
-
+We do not have environmental data we only have Cave data 
 
 
 # Session Information

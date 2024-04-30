@@ -20,7 +20,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      fig.path = "../figures/05_CommunityAnalysis")
+                      fig.path = "/local/workdir/sna49/moon_milk/moonmilk/figures/05_CommunityAnalysis")
 ```
 
 # Goals 
@@ -439,19 +439,20 @@ phylum_df <-
   #filter out phyla that are <1% - get rid fo lwo abundant phyla
   dplyr::filter(Abundance > 0.01) 
 
+
 #plot phylum abundances - make sure to load phylum colors
-phylum_df %>% 
+phylum1 <-
+  phylum_df %>% 
   #its important to have one sample per x value, 
   #otherwise, it will take the sum between multiple samples 
-  dplyr::filter(depth == 0.0)
   ggplot(aes(x = cave, y = Abundance, fill = Phylum)) +
-    facet_grid(.~date) +
+    facet_grid(.~cave) +
   geom_bar(stat = "identity", color = "black") +
-    labs(title = "Surface Phylum Composition") +
+    labs(title = "Moon Milk Phylum Composition") +
     scale_fill_manual(values = phylum_colors) +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1))
-
+phylum1
 ```
 
 # Session Information 
