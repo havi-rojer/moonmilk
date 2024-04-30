@@ -1,1 +1,13 @@
 sequences.sh is a bash script provided by the european nucleotide database that includes the list of accession numbers and the script to conveniently download fastq.gz files
+
+Additionally we have:
+- 01_DADA2:
+  - these files include our ASV counts and .RData files for analysis
+- 02_PreProcessing:
+  - these files include our metadata.csv, raw_physeq.RData, raw_preprocessed_physeq.RData
+- 03_Phylogenetic_Tree:
+  - these files include our unrooted and rooted tree, our MAFT aligned asvs, preprocessed ASV fasta, and our phytree_preprocessed_physeq.RData
+- 04_Biodiversity:
+  - this has our iNEXT_data.RData file
+  
+  
