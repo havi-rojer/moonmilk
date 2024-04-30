@@ -61,6 +61,10 @@ reverse_reads <- list.files(raw_fastqs_path, pattern = "_2.fastq.gz", full.names
 head(reverse_reads)
 ```
 
+```{r setup, include=FALSE}
+#setwd("/local/workdir/sna49/moon_milk/moonmilk/biomi6300_moonmilk_amplicon_analysis")
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.path = "/local/workdir/sna49/moon_milk/moonmilk/figures/01_DADA2") # Send any figures to this folder
+```
 # Assess Raw Read Quality 
 
 ## Evaluate raw sequence quality 
@@ -180,6 +184,7 @@ filtered_reads <-
   filterAndTrim(fwd = forward_reads, filt = filtered_forward_reads,
               rev = reverse_reads, filt.rev = filtered_reverse_reads,
               maxN = 0, maxEE = c(1,1), 
+              orient.fwd = "CCTACGGG",
               truncLen = 250, rm.phix = TRUE, compress = TRUE, multithread = TRUE)
 
 # output
@@ -548,11 +553,14 @@ track_counts_df %>%
 # Assign Taxonomy 
 
 Here, we will use the silva database version 138!
+
+It is extremly important to note that our dataset was originally super weird. What fixed our dataset (thanks to Gus!!!!!) was to find reverse complimented ASVs in our dataset and write out the function as "tryRC = TRUE" and it made our dataset so much cleaner and not look insane! We now have acceptable plots
 ```{r assign-tax}
 # Classify the ASVs against a reference set using the RDP Naive Bayesian Classifier described by Wang et al., (2007) in AEM
 taxa_train <- 
   assignTaxonomy(noChimeras_ASV_table, 
                  "/workdir/in_class_data/taxonomy/silva_nr99_v138.1_train_set.fa.gz", 
+                 tryRC = TRUE,
                  multithread=TRUE)
 
 # Add the genus/species information 
@@ -576,7 +584,7 @@ rownames(taxa_print) <- NULL
 Below, we will prepare the following: 
 
 1. Two ASV Count tables: 
-      a. With ASV seqs: ASV headers include the *entire* ASV sequence ~250bps.
+      a. With ASV seqs: ASV headers include the *entire* ASV sequence. We are using a dataset with V3-V4 region so we expect a biomodal curve for the number of sequences found (we will see this later on and will need to trim our ASVs accordingly)
       b. with ASV names: This includes re-written and shortened headers like ASV_1, ASV_2, etc, which will match the names in our fasta file below.  
 2. `ASV_fastas`: A fasta file that we can use to build a tree for phylogenetic analyses (e.g. phylogenetic alpha diversity metrics or UNIFRAC dissimilarty).  
 
