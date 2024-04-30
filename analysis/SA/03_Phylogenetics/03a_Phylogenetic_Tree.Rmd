@@ -50,7 +50,7 @@ set.seed(0909199)
 pacman::p_load(phytools, ggtree, RColorBrewer, install = FALSE)
 
 # Load physeq 
-load("data/02_PreProcessing/raw_preprocessed_physeq.RData")
+load("/local/workdir/sna49/moon_milk/moonmilk/data/02_PreProcessing/raw_preprocessed_physeq.RData")
 raw_preprocessed_physeq
 ```
 
