@@ -1,0 +1,265 @@
+---
+title: "02_PreProcessing"
+author: "sophiaaredas"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: show
+    highlight: default
+    keep_md: yes
+    theme: journal
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+      toc_depth: 3
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.path = "../figures/04_Biodiversity/",
+                      fig.align = "center")
+```
+
+# Setting the Environment 
+
+## Set the seed 
+```{r set-seed}
+set.seed(09091999)
+```
+
+## Load Libraries 
+```{r load-packages}
+pacman::p_load(tidyverse, devtools, patchwork, iNEXT, phyloseq,
+               install = FALSE)
+```
+
+## Load in Data 
+```{r load-data}
+load("/local/workdir/sna49/moon_milk/moonmilk/data/02_PreProcessing/raw_preprocessed_physeq.RData")
+raw_preprocessed_physeq
+
+# Intiution Check 
+min(sample_sums(raw_preprocessed_physeq))
+
+# Make metadata dataframe
+metadata_df <-
+  raw_preprocessed_physeq %>%
+  sample_data() %>%
+  data.frame()
+
+#View(metadata_df)
+
+# Setting colors for caves
+cave_colors <- c(
+  "Fata Apei Cave " = "dodgerblue4",
+  "Ferice Cave " = "#D8BFD8",
+  "Nestor Cave " = "#D9CC3C",
+  "Tausoare Cave " = "#A0E0BA")
+```
+
+
+# Goals
+
+1. Calculate the Hill Diversity of the samples. 
+2. Evaluate the rarefaction curves. 
+3. Evaluate the Diversity values. 
+4. Makes notes of specific samples and their seq depth. 
+
+# Diversity Calculations with iNEXT 
+
+```{r calc-div}
+# prepare input data 
+iNEXT_input_df <- 
+  raw_preprocessed_physeq %>%
+  otu_table() %>%
+  data.frame()
+
+# Quick check
+dim(iNEXT_input_df)
+
+# Run iNEXT: Calculate the Hill Numbers 
+# Note that: Species in ROWS, Samples in COLUMNS 
+# Remember to set the seed! 
+
+iNEXT_data <- iNEXT(iNEXT_input_df, 
+                    q = c(0,1,2), datatype = "abundance")
+
+# Save the file
+save(iNEXT_data, file = "/local/workdir/sna49/moon_milk/moonmilk/data/04_Biodiversity/iNEXT_data.RData")
+```
+
+# Evaluate the Diversity! 
+```{r load-div}
+load("/local/workdir/sna49/moon_milk/moonmilk/data/04_Biodiversity/iNEXT_data.RData")
+str(iNEXT_data)
+typeof(iNEXT_data)
+```
+
+# Plot Diversity 
+```{r plot-rarefaction}
+# Prepare Colors 
+color_df <- 
+  iNEXT_input_df %>%
+  colnames() %>%
+  data.frame()
+# Check
+head(color_df)
+# Rename the column 
+colnames(color_df)[1] <- "names"
+# Check
+head(color_df)
+
+
+# Make a helper dataframe for plotting with colors 
+iNEXT_color_df <- 
+  color_df %>%
+  # Merge with metadata
+  left_join(metadata_df, by = "names") %>%
+  # Merge with colors for plotting with ggiNEXT
+  left_join(data.frame(cave_colors = cave_colors,
+            cave = names(cave_colors)),
+            by = "cave")
+```
+
+# Plot Rarefaction with `ggiNEXT`
+
+```{r ggiNEXT, fig.width=8, fig.height=3.5}
+# Plot rarefaction! 
+# rarefaction/extrapolation curve, type = 1 
+
+# Order q: 
+  # 0 = Richness/ Number of Total taxa
+  # 1 = Exponential Shannon / Number of "Common" taxa
+  # 2 = Inverse Simpson / Number of "Dominant" taxa 
+
+ggiNEXT(iNEXT_data, type = 1, facet.var = "Order.q") + 
+  facet_wrap(~Order.q, scales = "fixed") + 
+  scale_color_manual(values = iNEXT_color_df$cave_colors, guide = FALSE) + 
+  scale_fill_manual(values = iNEXT_color_df$cave_colors, guide = FALSE) + 
+  scale_shape_manual(values = base::rep(17, nsamples(raw_preprocessed_physeq)),
+                     guide = FALSE) +
+  labs(x = "Number of Sequences (Library Size)", 
+       y = "Effective Number of ASVs") + 
+  theme_bw() 
+```
+
+Remembering that an Order q of:  
+
+  - 0 = Richness/ Number of Total taxa
+  - 1 = Exponential Shannon / Number of "Common" taxa
+  - 2 = Inverse Simpson / Number of "Dominant" taxa 
+  
+*Also note that iNEXT will extrapolate the number of sequences to double the sequencing depth of the sample!*
+
+Finally, let's draw some conclusions from the plot above (we discussed in class & I'll summarize here):  
+
+1. The best gift of a diversity measure: *All three diversity measures are on the same x-axis: The Effective Number of Species.*  
+2. As q increases from 0 to 1 to 2, the abundance of the species is weighted more, so the rarefaction curve platueaus earlier. **This is important because it indicates that richess is the most sensitive to sequencing depth!** However, Shannon and even less sensitive is Simpson!  
+3. Most of the sample rarefaction curves appear to plateau but we need to look deeper.  
+4. There appears to be a sample with much lower richness than the rest of the dataset. Let's keep our eyes on this sample...  
+
+
+In your analysis, please provide a clear description! 
+
+# Manually plot Diversity 
+
+## Rarefaction
+```{r iNEXT-manual, fig.width=6, fig.height=6}
+iNEXT_manual_df <- 
+  iNEXT_data$iNextEst$size_based %>%
+  dplyr::rename(names = Assemblage) %>%
+  # Fix the samples names 
+  # join with metadata 
+  left_join(., metadata_df, by = "names") %>%
+  # Add colors to data frame
+  left_join(., data.frame(cave_colors = cave_colors,
+                          cave = names(cave_colors)),
+            by = "cave") 
+# Inspect 
+dim(iNEXT_manual_df)
+str(iNEXT_manual_df)
+
+# Plot it - Rarefaction Curve 
+iNEXT_manual_df %>%
+  # Filter out rows that are calcaulted by rarefaction from iNEXT
+  dplyr::filter(Method == "Rarefaction") %>%
+  # Now, let's draw the plot, be sure to group by the samples if using geom_line!
+  ggplot(aes(x = m, y= qD, color = cave, group = names)) + 
+  geom_line() + 
+  # Facet with the station to see the samples better 
+  facet_grid(Order.q~cave, scales = "free") + 
+  scale_color_manual(values = cave_colors) + 
+  labs(x = "Number of Sequences (Library Size)", 
+       y = "Effective Number of ASVs") + 
+  theme_bw() + 
+  #guides(color = guide_legend(nrow = 2, byrow = TRUE)) + 
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+        legend.title = element_blank()) 
+```
+
+
+While the rarefaction curves from `ggiNEXT` agglomerated the data together, it was hard to see individual samples. Above, we can start to tease apart specific samples within each station that appear higher. 
+
+*Please interpret your results!!*
+
+Some take-aways:  
+
+- Richness:  
+    - The richness is higher in Feta Apei
+    - all the other caves have similar but lower richness
+    
+- Shannon:
+  - 
+    
+- Simpson's Diversity:  
+    - Again Feta Apei had the highest simpsons diversity meaning that there are more rare taxa 
+    
+- Shannon Diversity
+  - Feta Apei had the highest Shannon 
+  - Tausoare had the loweset Shannon than the other caves
+
+# Boxplots of Diversity 
+
+Now, let's zoom in on a bit of a better view of the data by visualizing it in a boxplot...  
+
+```{r div-boxplot, fig.height = 3.5, fig.width = 9}
+# Boxplots by station 
+iNEXT_manual_df %>%
+  ggplot(aes(x = cave, y = qD, fill = cave, color = cave)) + 
+  facet_wrap(~Order.q, scales = "free") + 
+  geom_jitter(size = 0.5, alpha = 0.5) + 
+  geom_boxplot(alpha = 0.5, outlier.shape = NA) + 
+  scale_color_manual(values = cave_colors) + 
+  scale_fill_manual(values = cave_colors) + 
+  labs(y = "Effective Number of ASVs") + 
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_blank(),
+        legend.title = element_blank())
+```
+
+We can draw that:  
+
+- Richness is different between stations it looks significant but we need to tst. Fata Apei has the highest richness. The other caves have similar richness. 
+
+- Across teh board Fata Apei has the highest Richness, Shannon, and Simpson
+
+- Ferice cave apears to have the most variation 
+- The lowest shannon and simpson are tausoare indicating that theres fewr common/dominant taxa in comparision to other communities 
+ 
+# Environmental Variable Check 
+We do not have environmental data 
+
+
+
+# Session Information
+```{r session-info}
+devtools::session_info()
+```
+
