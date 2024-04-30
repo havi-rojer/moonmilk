@@ -1,7 +1,7 @@
 ---
 title: "02_PreProcessing"
 author: "sophiaaredas"
-date: "2024-04-04"
+date: "2024-04-24"
 output:
   html_document:
     code_folding: show
@@ -427,7 +427,7 @@ num_chloro_ASVs
 ```
 
 ```
-## [1] 4
+## [1] 5
 ```
 
 ```r
@@ -448,7 +448,7 @@ num_mito_ASVs
 ```
 
 ```
-## [1] 3
+## [1] 1
 ```
 
 ```r
@@ -457,9 +457,9 @@ noChlorosMitos_physeq
 
 ```
 ## phyloseq-class experiment-level object
-## otu_table()   OTU Table:         [ 2138 taxa and 10 samples ]
+## otu_table()   OTU Table:         [ 2139 taxa and 10 samples ]
 ## sample_data() Sample Data:       [ 10 samples by 10 sample variables ]
-## tax_table()   Taxonomy Table:    [ 2138 taxa by 9 taxonomic ranks ]
+## tax_table()   Taxonomy Table:    [ 2139 taxa by 9 taxonomic ranks ]
 ```
 
 ```r
@@ -468,7 +468,7 @@ ntaxa(raw_physeq) - ntaxa(noChlorosMitos_physeq)
 ```
 
 ```
-## [1] 7
+## [1] 6
 ```
 
 ```r
@@ -477,7 +477,7 @@ ntaxa(noChlorosMitos_physeq)/ntaxa(raw_physeq)
 ```
 
 ```
-## [1] 0.9967366
+## [1] 0.9972028
 ```
 
 # Evaulate and remove the control samples 
@@ -494,9 +494,9 @@ noChlorosMitos_physeq
 
 ```
 ## phyloseq-class experiment-level object
-## otu_table()   OTU Table:         [ 2138 taxa and 10 samples ]
+## otu_table()   OTU Table:         [ 2139 taxa and 10 samples ]
 ## sample_data() Sample Data:       [ 10 samples by 10 sample variables ]
-## tax_table()   Taxonomy Table:    [ 2138 taxa by 9 taxonomic ranks ]
+## tax_table()   Taxonomy Table:    [ 2139 taxa by 9 taxonomic ranks ]
 ```
 
 ```r
@@ -527,9 +527,9 @@ head(seqSums_df)
 
 ```
 ##         names TotalSeqs  input filtered denoisedF denoisedR merged nochim
-## 1 ERR11588428     11908  96845    58385     53663     54456  40228  11916
+## 1 ERR11588428     11913  96845    58385     53663     54456  40228  11916
 ## 2 ERR11588429     12008 101519    58720     53193     53731  37668  12022
-## 3 ERR11588430     11661  95676    57401     52549     52541  37461  11725
+## 3 ERR11588430     11666  95676    57401     52549     52541  37461  11725
 ## 4 ERR11588431      3005  90880    55342     54927     54543  53845   3005
 ## 5 ERR11588432      5515  85608    53582     53088     52881  52115   5515
 ## 6 ERR11588433      2956  73835    45215     44592     45039  43966   2956
@@ -636,7 +636,7 @@ devtools::session_info()
 ##  collate  en_US.UTF-8
 ##  ctype    en_US.UTF-8
 ##  tz       America/New_York
-##  date     2024-04-04
+##  date     2024-04-24
 ##  pandoc   3.1.1 @ /usr/lib/rstudio-server/bin/quarto/bin/tools/ (via rmarkdown)
 ## 
 ## ─ Packages ───────────────────────────────────────────────────────────────────
