@@ -49,7 +49,7 @@ set.seed(238428)
 ## Load Libraries
 ```{r load-libraries}
 #install.packages("vegan")
-pacman::p_load(tidyverse, devtools, phyloseq, patchwork, vegan,
+pacman::p_load(tidyverse, devtools, phyloseq, patchwork, vegan, dplyr,
                install = FALSE)
 
 ```
@@ -57,7 +57,7 @@ pacman::p_load(tidyverse, devtools, phyloseq, patchwork, vegan,
 ## Load Data 
 ```{r load-physeq}
 # Load in rooted phylogenetic tree! 
-load("data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
+load("/local/workdir/sna49/moon_milk/moonmilk/data/03_Phylogenetic_Tree/phytree_preprocessed_physeq.RData")
 ```
 
 # Explore Read Counts 
@@ -84,7 +84,24 @@ raw_TotalSeqs_df %>%
   theme_classic()
 ```
 
-# the graph looks fine we wont be removing anything 
+## remove lowly seq sample
+
+```{r low-seq-sample}
+raw_rooted_physeq <- 
+  midroot_physeq %>%
+  # remove lowly seq sample that was outlier in alpha diversity analysis
+  subset_samples(names != "ERR11588433") %>%
+  # any asvs unique to this sample will also be removed 
+  prune_taxa(taxa_sums(.) > 0, .)
+
+# Inspect 
+raw_rooted_physeq
+
+# what is the minimum number of sequences 
+raw_rooted_physeq %>%
+  sample_sums() %>%
+  min()
+```
 
 ## Normalize read counts  
 ```{r scale-reads}
@@ -124,16 +141,16 @@ scale_reads <- function(physeq, n = min(sample_sums(physeq)), round = "round") {
 
 This is where one might decide use rarefaction to normalize data. 
 ```{r scale-physeq}
-min(sample_sums(midroot_physeq))
+min(sample_sums(raw_rooted_physeq))
 
 # Scale reads by the above function
 scaled_rooted_physeq <- 
-  midroot_physeq %>%
+  raw_rooted_physeq %>%
   scale_reads(round = "matround")
 
 # Calculate the read depth 
 scaled_TotalSeqs_df <- 
-  midroot_physeq %>%
+  raw_rooted_physeq %>%
   sample_sums() %>%
   data.frame()
 colnames(scaled_TotalSeqs_df)[1] <-"TotalSeqs"
@@ -373,6 +390,69 @@ permutest(beta_bray_cave)
 ```
 
 Above, our variance is impacted by cave. Therefore, we need to be very careful about what we conclude about our data. 
+
+# Taxonomic Composition
+
+## Phylum Colors
+```{r phylum-colors, eval=FALSE}
+# Set the phylum colors
+phylum_colors <- c(
+  Acidobacteriota = "navy", 
+  Actinobacteriota = "darkslategray2", 
+  Armatimonadota = "deeppink1",
+  Alphaproteobacteria = "plum2", 
+  Bacteroidota = "gold", 
+  Betaproteobacteria = "plum1", 
+  Bdellovibrionota = "red1",
+  Chloroflexi="black", 
+  Crenarchaeota = "firebrick",
+  Cyanobacteria = "limegreen",
+  Deltaproteobacteria = "grey", 
+  Desulfobacterota="magenta",
+  Firmicutes = "#3E9B96",
+  Gammaproteobacteria = "greenyellow",
+  "Marinimicrobia (SAR406 clade)" = "yellow",
+  Myxococcota = "#B5D6AA",
+  Nitrospirota = "palevioletred1",
+  Proteobacteria = "royalblue",
+  Planctomycetota = "darkorange", 
+  "SAR324 clade(Marine group B)" = "olivedrab",
+  #Proteobacteria_unclassified = "greenyellow",
+  Thermoplasmatota = "green",
+  Verrucomicrobiota = "darkorchid1")
+ # Other = "grey")
+```
+
+#### Plot Phylum Composition
+```{r phylum-composition, eval=FALSE}
+#calculate phylum relative abundance
+#note: read depth must be normalized in some way
+phylum_df <- 
+  scaled_rooted_physeq %>% 
+  # agglomerate at the phylum level
+  tax_glom(taxrank = "Phylum") %>% 
+  # transform counts to relative abundance
+  transform_sample_counts(function (x) {x/sum(x)}) %>% 
+  # melt to a long format
+    #phyloseq version of melting data into long dataframe
+  psmelt() %>% 
+  #filter out phyla that are <1% - get rid fo lwo abundant phyla
+  dplyr::filter(Abundance > 0.01) 
+
+#plot phylum abundances - make sure to load phylum colors
+phylum_df %>% 
+  #its important to have one sample per x value, 
+  #otherwise, it will take the sum between multiple samples 
+  dplyr::filter(depth == 0.0)
+  ggplot(aes(x = cave, y = Abundance, fill = Phylum)) +
+    facet_grid(.~date) +
+  geom_bar(stat = "identity", color = "black") +
+    labs(title = "Surface Phylum Composition") +
+    scale_fill_manual(values = phylum_colors) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1))
+
+```
 
 # Session Information 
 For reproducibility 

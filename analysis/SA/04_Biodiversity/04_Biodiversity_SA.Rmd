@@ -95,7 +95,7 @@ save(iNEXT_data, file = "/local/workdir/sna49/moon_milk/moonmilk/data/04_Biodive
 
 # Evaluate the Diversity! 
 ```{r load-div}
-load("data/04_Biodiversity/iNEXT_data.RData")
+load("/local/workdir/sna49/moon_milk/moonmilk/data/04_Biodiversity/iNEXT_data.RData")
 str(iNEXT_data)
 typeof(iNEXT_data)
 ```
