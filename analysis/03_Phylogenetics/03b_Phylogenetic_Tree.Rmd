@@ -46,11 +46,11 @@ pacman::p_load(tidyverse, phyloseq, ggtree, phytools,
 ## Load Data files 
 ```{r load-data}
 # Preprocessed phyloseq object 
-load("data/02_PreProcessing/raw_preprocessed_physeq.RData")
+load("/local/workdir/sna49/moon_milk/moonmilk/data/02_PreProcessing/raw_preprocessed_physeq.RData")
 raw_preprocessed_physeq
 
 # Load in the tree! 
-unrooted_tree <- read.tree("data/03_Phylogenetic_Tree/ASVs_unrooted.tree")
+unrooted_tree <- read.tree("/local/workdir/sna49/moon_milk/moonmilk/data/03_Phylogenetic_Tree/ASVs_unrooted.tree")
 unrooted_tree
 str(unrooted_tree)
 ```

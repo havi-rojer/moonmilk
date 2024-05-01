@@ -205,10 +205,10 @@ soren_cave_pcoa
 
 Note that:  
 
-- Axis 1 = ~20.5% of variation  
-- Axis 2 = ~16.1% of variation 
+- Axis 1 = ~22.7% of variation  
+- Axis 2 = ~16.5% of variation 
 
-This means we explain 36.6% of the variation in the data in these two axes. 
+This means we explain 39.2% of the variation in the data in these two axes. 
 
 
 ### Bray
@@ -236,10 +236,10 @@ bray_cave_pcoa
 Here, we are evaluating the shared taxa and then weighting them by their abundances, which provides more influence for species that are more abundant. 
 
 
-- Axis 1 = ~20.2% of variation  
-- Axis 2 = ~16.9% of variation 
+- Axis 1 = ~26.2% of variation  
+- Axis 2 = ~19.6% of variation 
 
-This means we explain 37.1% of the variation in the data in these two axes, which is more than the previous plot with the Sorensen Dissimilarity. Abundance does seem to have an influence!!
+This means we explain 45.8% of the variation in the data in these two axes, which is more than the previous plot with the Sorensen Dissimilarity. Abundance does seem to have an influence!!
 
 It also looks like the samples are now separating more within each group than they did a bit more with Sorensen. Please note this with how the Copano West samples are looking between the Bray-Curtis and the Sorensen plots. 
 
@@ -282,10 +282,10 @@ Here, we are evaluating the shared taxa and then weighting them by their abundan
 
 Note that:   
 
-- Axis 1 = ~99.5% of variation  
-- Axis 2 = ~0.2% of variation 
+- Axis 1 = ~51.7% of variation  
+- Axis 2 = ~18.2% of variation 
 
-This means we explain *99.7*% of the variation in the data in these two axes (!!!), which is significantly more than the previous plots with the taxonomic dissimilarity measures. Here, phylogeny seems to be very important! This means that taxa that are abundant are found in different places in the phylogenetic tree. Therefore, the evoultionary distances (aka the branch lengths) and their abundances seem to have a major influence!!
+This means we explain *69.9*% of the variation in the data in these two axes (!!!), which is significantly more than the previous plots with the taxonomic dissimilarity measures. Here, phylogeny seems to be very important! This means that taxa that are abundant are found in different places in the phylogenetic tree. Therefore, the evoultionary distances (aka the branch lengths) and their abundances seem to have a major influence!!
 
 
 ## Combine PCoAs
@@ -294,7 +294,7 @@ Let's plot all three together into one plot to have a concise visualization of t
 ```{r pcoa-together, fig.width=8, fig.height=3.5}
 (soren_cave_pcoa + theme(legend.position = "none")) + 
   (bray_cave_pcoa + theme(legend.position = "none")) + 
-    (wUNI_cave_pcoa + theme(legend.position = "none"))
+    (wUNI_cave_pcoa + theme(legend.position = "right"))
 ```
 
 ansitioning to Community Analysis. Scale your reads, and ordinate in a PCoA using Weighted Unifrac distances. Color points based on a relevant variable in your metadata. Add a title to your plot, indicating the distance metric used and the metadata variable being tested. Upload this plot here.
@@ -446,13 +446,32 @@ phylum1 <-
   #its important to have one sample per x value, 
   #otherwise, it will take the sum between multiple samples 
   ggplot(aes(x = cave, y = Abundance, fill = Phylum)) +
-    facet_grid(.~cave) +
-  geom_bar(stat = "identity", color = "black") +
+  geom_bar(stat = "identity") +
     labs(title = "Moon Milk Phylum Composition") +
     scale_fill_manual(values = phylum_colors) +
     theme_bw() +
     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1))
 phylum1
+```
+
+```{r phylum-station-actinobacteria, fig.width=5, fig.height=3.5}
+# Narrow in on a specific group
+# Actinobacteriota - y: abundance, x: station, dot plot + boxplot
+# actino <-
+#   phylum_df %>%
+#   dplyr::filter(Phylum == "Actinobacteria") %>%
+#   # build the plot 
+#   ggplot(aes(x = cave, y = Abundance, 
+#              fill = cave, color = cave)) + 
+#   geom_boxplot(alpha = 0.5, outlier.shape = NA) + # outliers not plotted here in boxplot 
+#   geom_jitter() + 
+#   theme_bw() + 
+#   labs(title = "Actinobacteriota Phylum Abundance") + 
+#     theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
+#           legend.position = "right")
+# Statistically: Kruskall-Wallis followed by a Tukey's Posthoc test
+# These are non-parametric (non-normal) stat tests 
+#actino
 ```
 
 # Session Information 
